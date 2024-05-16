@@ -14,9 +14,9 @@ const double xlat_channelizer::smartnet_symbol_rate;
 
 xlat_channelizer::DecimSettings xlat_channelizer::get_decim(long speed) {
   long s = speed;
-  long if_freqs[] = {24000, 25000, 32000};
+  long if_freqs[] = {20000, 24000, 25000, 32000, 40000, 48000, 50000, 64000};
   DecimSettings decim_settings = {-1, -1};
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 8; i++) {
     long if_freq = if_freqs[i];
     if (s % if_freq != 0) {
       continue;
@@ -56,6 +56,11 @@ xlat_channelizer::xlat_channelizer(double input_rate, int samples_per_symbol, do
   const float pi = M_PI;
 
   int decimation = floor(input_rate / channel_rate);
+  xlat_channelizer::DecimSettings decim_settings = get_decim(input_rate);
+  if (decim_settings.decim != -1) {
+    decimation = decim_settings.decim;
+  } 
+  
   double resampled_rate = float(input_rate) / float(decimation);
   /*
       std::vector<float> if_coeffs;

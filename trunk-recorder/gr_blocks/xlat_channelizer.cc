@@ -12,31 +12,42 @@ const double xlat_channelizer::phase1_symbol_rate;
 const double xlat_channelizer::phase2_symbol_rate;
 const double xlat_channelizer::smartnet_symbol_rate;
 
-xlat_channelizer::DecimSettings xlat_channelizer::get_decim(long speed) {
-  long s = speed;
-  long if_freqs[] = {20000, 24000, 25000, 32000, 40000, 48000, 50000, 64000};
-  DecimSettings decim_settings = {-1, -1};
-  for (int i = 0; i < 8; i++) {
+xlat_channelizer::DecimSettings xlat_channelizer::get_decim(long target_rate) {
+
+  double t = target_rate;
+  long if_freqs[] = {target_rate, 20000, 24000, 25000, 32000, 40000, 48000, 50000, 64000};
+  xlat_channelizer::DecimSettings decim_settings = {-1, -1};
+
+  for (size_t i = 0; i < sizeof(if_freqs) / sizeof(long); i++) {
     long if_freq = if_freqs[i];
-    if (s % if_freq != 0) {
-      continue;
-    }
-    long q = s / if_freq;
-    if (q & 1) {
+
+    BOOST_LOG_TRIVIAL(debug) << "Trying if_freq: " << if_freq;
+
+    if (if_freq < t) {
+      BOOST_LOG_TRIVIAL(debug) << "rate too small" ;
       continue;
     }
 
-    if ((q >= 40) && ((q & 3) == 0)) {
-      decim_settings.decim = q / 4;
-      decim_settings.decim2 = 4;
-    } else {
-      decim_settings.decim = q / 2;
-      decim_settings.decim2 = 2;
+    
+    if  ((long(d_input_rate) % if_freq) != 0) {
+      BOOST_LOG_TRIVIAL(debug) << "rate not divisible" ;
+      continue;
     }
-    BOOST_LOG_TRIVIAL(debug) << "P25 recorder Decim: " << decim_settings.decim << " Decim2:  " << decim_settings.decim2;
+    
+    long q = d_input_rate / if_freq;
+
+    decim_settings.decim = q;
+
+    BOOST_LOG_TRIVIAL(info) << "Recorder Decim: input_rate: " << d_input_rate << " target_rate: " << t << " output_rate: " << if_freq << " Decim: " << decim_settings.decim << " ARB: " << double(t) / if_freq;
     return decim_settings;
   }
-  BOOST_LOG_TRIVIAL(error) << "P25 recorder Decim: Nothing found";
+  
+  decim_settings.decim = floor(d_input_rate / t);
+  double out_rate = d_input_rate / decim_settings.decim;
+
+  BOOST_LOG_TRIVIAL(error) << "Recorder Decim: Nothing found using target_rate: " << t;
+  BOOST_LOG_TRIVIAL(error) << "Recorder Decim: input_rate: " << d_input_rate << " target_rate: " << t << " output_rate: " << out_rate << " Decim: " << decim_settings.decim << " ARB: " << double(t) / (d_input_rate / decim_settings.decim);
+
   return decim_settings;
 }
 

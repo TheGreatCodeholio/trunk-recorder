@@ -98,7 +98,7 @@ private:
 
   gr::filter::pfb_arb_resampler_ccf::sptr arb_resampler;
 
-  static DecimSettings get_decim(long speed);
+  DecimSettings get_decim(long speed);
 };
 
 #endif

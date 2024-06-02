@@ -148,7 +148,7 @@ analog_recorder::analog_recorder(Source *src, Recorder_Type type, float tone_fre
   audio_resampler_taps = design_filter(1, (system_channel_rate / wav_sample_rate)); // Calculated to make sample rate changable -- must be an integer
 
   // downsample from 48k to 8k
-  decim_audio = gr::filter::fir_filter_fff::make((system_channel_rate / wav_sample_rate), audio_resampler_taps); // Calculated to make sample rate changable
+  decim_audio = gr::filter::rational_resampler_fff::make(1, 2); // Calculated to make sample rate changable
 
   // tm *ltm = localtime(&starttime);
 

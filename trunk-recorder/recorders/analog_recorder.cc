@@ -14,23 +14,29 @@ bool analog_recorder::logging = false;
 
 std::vector<float> design_filter(double interpolation, double deci) {
   float beta = 5.0;
-  float trans_width = 0.5 - 0.4;
-  float mid_transition_band = 0.5 - trans_width / 2;
+  // Ensure the cutoff frequency is low enough to pass CTCSS tones
+  float cutoff_freq = 300.0; // Cutoff frequency in Hz, can be adjusted as needed
+  float transition_width = 50.0; // Transition width in Hz, can be adjusted as needed
+
+  // Normalize frequencies by the decimation factor
+  float nyquist_rate = 0.5 * deci;
+  float normalized_cutoff = cutoff_freq / nyquist_rate;
+  float normalized_transition_width = transition_width / nyquist_rate;
 
 #if GNURADIO_VERSION < 0x030900
   std::vector<float> result = gr::filter::firdes::low_pass(
       interpolation,
-      1,
-      mid_transition_band / interpolation,
-      trans_width / interpolation,
+      deci,
+      normalized_cutoff,
+      normalized_transition_width,
       gr::filter::firdes::WIN_KAISER,
       beta);
 #else
   std::vector<float> result = gr::filter::firdes::low_pass(
       interpolation,
-      1,
-      mid_transition_band / interpolation,
-      trans_width / interpolation,
+      deci,
+      normalized_cutoff,
+      normalized_transition_width,
       gr::fft::window::WIN_KAISER,
       beta);
 #endif
@@ -195,7 +201,7 @@ analog_recorder::analog_recorder(Source *src, Recorder_Type type, float tone_fre
   squelch_two = gr::analog::pwr_squelch_ff::make(-200, 0.01, 0, true);
 
   if (use_tone_squelch) {
-    tone_squelch = gr::analog::ctcss_squelch_ff::make(wav_sample_rate, this->tone_freq, 0.01, 0, 0, false);
+    tone_squelch = gr::analog::ctcss_squelch_ff::make(wav_sample_rate, this->tone_freq, 0.01, 3000, 0, false);
   }
   // k = quad_rate/(2*math.pi*max_dev) = 48k / (6.283185*5000) = 1.527
 

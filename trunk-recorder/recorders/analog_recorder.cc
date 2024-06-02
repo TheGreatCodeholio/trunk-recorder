@@ -12,24 +12,25 @@ using namespace std;
 bool analog_recorder::logging = false;
 // static int rec_counter = 0;
 
-std::vector<float> design_filter(double input_sample_rate, double output_sample_rate) {
+std::vector<float> design_filter(double interpolation, double deci) {
   float beta = 5.0;
-
+  float trans_width = 0.5 - 0.4;
+  float mid_transition_band = 0.5 - trans_width / 2;
 
 #if GNURADIO_VERSION < 0x030900
   std::vector<float> result = gr::filter::firdes::low_pass(
+      interpolation,
       1,
-      input_sample_rate,
-      output_sample_rate / 2,
-      .1,
+      mid_transition_band / interpolation,
+      trans_width / interpolation,
       gr::filter::firdes::WIN_KAISER,
       beta);
 #else
   std::vector<float> result = gr::filter::firdes::low_pass(
+      interpolation,
       1,
-      input_sample_rate,
-      output_sample_rate / 2,
-      .1,
+      mid_transition_band / interpolation,
+      trans_width / interpolation,
       gr::fft::window::WIN_KAISER,
       beta);
 #endif
@@ -193,9 +194,7 @@ analog_recorder::analog_recorder(Source *src, Recorder_Type type, float tone_fre
   // recording doesn't contain blank spaces between transmissions
   squelch_two = gr::analog::pwr_squelch_ff::make(-200, 0.01, 0, true);
 
-  if (use_tone_squelch) {
-    tone_squelch = gr::analog::ctcss_squelch_ff::make(wav_sample_rate, this->tone_freq, 0.01, 3000, 0, false);
-  }
+
   // k = quad_rate/(2*math.pi*max_dev) = 48k / (6.283185*5000) = 1.527
 
   int d_max_dev = 5000;
@@ -212,12 +211,23 @@ analog_recorder::analog_recorder(Source *src, Recorder_Type type, float tone_fre
   calculate_iir_taps(d_tau);
   deemph = gr::filter::iir_filter_ffd::make(d_fftaps, d_fbtaps);
 
-  audio_resampler_taps = design_filter(system_channel_rate, wav_sample_rate); // Calculated to make sample rate changable -- must be an integer
+  audio_resampler_taps = design_filter(1, (system_channel_rate / wav_sample_rate)); // Calculated to make sample rate changable -- must be an integer
   BOOST_LOG_TRIVIAL(info) << "Analog Audio Resampler Taps: " << audio_resampler_taps.size() << " rate: " << system_channel_rate / wav_sample_rate;
   // downsample from 48k to 8k
   decim_audio = gr::filter::fir_filter_fff::make((system_channel_rate / wav_sample_rate), audio_resampler_taps); // Calculated to make sample rate changable
 
   // tm *ltm = localtime(&starttime);
+
+  if (use_tone_squelch) {
+    BOOST_LOG_TRIVIAL(info) << "Setting up CTCSS squelch with frequency: " << this->tone_freq;
+    BOOST_LOG_TRIVIAL(info) << "Initial decimation: " << initial_decim;
+    BOOST_LOG_TRIVIAL(info) << "Initial rate: " << initial_rate;
+    BOOST_LOG_TRIVIAL(info) << "Decimation factor: " << decim;
+    BOOST_LOG_TRIVIAL(info) << "Resampled rate: " << resampled_rate;
+    BOOST_LOG_TRIVIAL(info) << "Arb rate: " << arb_rate;
+
+    tone_squelch = gr::analog::ctcss_squelch_ff::make(wav_sample_rate, this->tone_freq, 0.01, 3000, 0, false);
+  }
 
   wav_sink = gr::blocks::transmission_sink::make(1, wav_sample_rate, 16); //  Configurable
 

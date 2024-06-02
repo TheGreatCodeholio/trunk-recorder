@@ -139,6 +139,9 @@ analog_recorder::analog_recorder(Source *src, Recorder_Type type, float tone_fre
   std::vector<gr_complex> dest(inital_lpf_taps.begin(), inital_lpf_taps.end());
 
   prefilter = make_freq_xlating_fft_filter(initial_decim, dest, offset, input_rate);
+  BOOST_LOG_TRIVIAL(info) << "Initial decimation: " << initial_decim;
+  BOOST_LOG_TRIVIAL(info) << "Initial rate after prefilter: " << initial_rate;
+  BOOST_LOG_TRIVIAL(info) << "Resampled rate after prefilter and lpf: " << resampled_rate;
 
   channel_lpf = gr::filter::fft_filter_ccf::make(decim, channel_lpf_taps);
 
@@ -180,6 +183,8 @@ analog_recorder::analog_recorder(Source *src, Recorder_Type type, float tone_fre
 
   arb_resampler = gr::filter::pfb_arb_resampler_ccf::make(arb_rate, arb_taps);
 
+  double final_sample_rate = arb_rate * resampled_rate;
+  BOOST_LOG_TRIVIAL(info) << "Final sample rate after arb_resampler: " << final_sample_rate;
 
   // on a trunked network where you know you will have good signal, a carrier
   // power squelch works well. real FM receviers use a noise squelch, where
@@ -211,11 +216,11 @@ analog_recorder::analog_recorder(Source *src, Recorder_Type type, float tone_fre
   calculate_iir_taps(d_tau);
   deemph = gr::filter::iir_filter_ffd::make(d_fftaps, d_fbtaps);
 
-  audio_resampler_taps = design_filter(1, (resampled_rate / wav_sample_rate)); // Calculated to make sample rate changable -- must be an integer
-  BOOST_LOG_TRIVIAL(info) << "Analog Audio Resampler Taps: " << audio_resampler_taps.size() << " rate: " << resampled_rate / wav_sample_rate;
-  BOOST_LOG_TRIVIAL(info) << "Audio resampler created with rate: " << resampled_rate / wav_sample_rate;
+  audio_resampler_taps = design_filter(1, (final_sample_rate / wav_sample_rate)); // Calculated to make sample rate changable -- must be an integer
+  BOOST_LOG_TRIVIAL(info) << "Analog Audio Resampler Taps: " << audio_resampler_taps.size() << " rate: " << final_sample_rate / wav_sample_rate;
+  BOOST_LOG_TRIVIAL(info) << "Audio resampler created with rate: " << final_sample_rate / wav_sample_rate;
   // downsample from 48k to 8k
-  decim_audio = gr::filter::fir_filter_fff::make((resampled_rate / wav_sample_rate), audio_resampler_taps); // Calculated to make sample rate changable
+  decim_audio = gr::filter::fir_filter_fff::make((final_sample_rate / wav_sample_rate), audio_resampler_taps); // Calculated to make sample rate changable
 
   // tm *ltm = localtime(&starttime);
 

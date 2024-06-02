@@ -117,8 +117,6 @@ private:
   float quad_gain;
   double wav_sample_rate;
   double squelch_db;
-  int decim_factor;
-  int ctcss_length;
   time_t timestamp;
   time_t starttime;
   bool use_tone_squelch;

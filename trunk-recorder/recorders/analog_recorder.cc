@@ -12,27 +12,27 @@ using namespace std;
 bool analog_recorder::logging = false;
 // static int rec_counter = 0;
 
-std::vector<float> design_filter(double interpolation, double deci) {
-  float beta = 5.0;
-  float trans_width = 0.5 - 0.4;
-  float mid_transition_band = 0.5 - trans_width / 2;
+std::vector<float> design_filter(double interpolation, double decimation) {
+  float beta = 5.0; // Beta parameter for the Kaiser window
+  float cutoff_freq = 300.0 / (0.5 * interpolation); // Normalized cutoff frequency, slightly above the highest CTCSS tone
+  float trans_width = 50.0 / (0.5 * interpolation); // Transition width
 
 #if GNURADIO_VERSION < 0x030900
   std::vector<float> result = gr::filter::firdes::low_pass(
-      interpolation,
-      1,
-      mid_transition_band / interpolation,
-      trans_width / interpolation,
-      gr::filter::firdes::WIN_KAISER,
-      beta);
+      interpolation, // Gain
+      1, // Sampling rate (normalized to 1)
+      cutoff_freq, // Normalized cutoff frequency
+      trans_width, // Normalized transition width
+      gr::filter::firdes::WIN_KAISER, // Window type
+      beta); // Beta parameter for Kaiser window
 #else
   std::vector<float> result = gr::filter::firdes::low_pass(
-      interpolation,
-      1,
-      mid_transition_band / interpolation,
-      trans_width / interpolation,
-      gr::fft::window::WIN_KAISER,
-      beta);
+      interpolation, // Gain
+      1, // Sampling rate (normalized to 1)
+      cutoff_freq, // Normalized cutoff frequency
+      trans_width, // Normalized transition width
+      gr::fft::window::WIN_KAISER, // Window type
+      beta); // Beta parameter for Kaiser window
 #endif
   return result;
 }
@@ -84,7 +84,6 @@ analog_recorder::analog_recorder(Source *src, Recorder_Type type, float tone_fre
   input_rate = source->get_rate();
   squelch_db = 0;
   talkgroup = 0;
-  float offset = 0;
   recording_count = 0;
   recording_duration = 0;
 
@@ -98,7 +97,6 @@ analog_recorder::analog_recorder(Source *src, Recorder_Type type, float tone_fre
 
   if (tone_freq > 0) {
     use_tone_squelch = true;
-    BOOST_LOG_TRIVIAL(info) << "Using tone squelch: " << tone_freq;
     this->tone_freq = tone_freq;
   } else {
     use_tone_squelch = false;
@@ -115,79 +113,15 @@ analog_recorder::analog_recorder(Source *src, Recorder_Type type, float tone_fre
     conventional = false;
   }
 
-
   // int samp_per_sym        = 10;
-  system_channel_rate = 96000; // 4800 * samp_per_sym;
+  system_channel_rate = 32000; // 4800 * samp_per_sym;
   wav_sample_rate = 16000;     // Must be an integer decimation of system_channel_rate
-                               /*  int decim               = floor(input_rate / 384000);
-                             
-  double pre_channel_rate = input_rate / decim;*/
+  decim_factor = system_channel_rate / wav_sample_rate; // create decimation factor
+  ctcss_length = 3000; // Set this to a value to a number high enough that enough samples get passed for ctcss detection Not too short of audio will be choppy as the filter will go on/off rapidly.
 
-  int initial_decim = floor(input_rate / 480000);
-  initial_rate = double(input_rate) / double(initial_decim);
-  int decim = floor(initial_rate / system_channel_rate);
-  double resampled_rate = double(initial_rate) / double(decim);
-
-#if GNURADIO_VERSION < 0x030900
-  inital_lpf_taps = gr::filter::firdes::low_pass_2(1.0, input_rate, 96000, 30000, 100, gr::filter::firdes::WIN_HANN);
-#else
-  inital_lpf_taps = gr::filter::firdes::low_pass_2(1.0, input_rate, 96000, 30000, 100, gr::fft::window::WIN_HANN);
-#endif
-  //  channel_lpf_taps =  gr::filter::firdes::low_pass_2(1.0, pre_channel_rate, 5000, 2000, 60);
-  channel_lpf_taps = gr::filter::firdes::low_pass_2(1.0, initial_rate, 4000, 1000, 100);
-
-  std::vector<gr_complex> dest(inital_lpf_taps.begin(), inital_lpf_taps.end());
-
-  prefilter = make_freq_xlating_fft_filter(initial_decim, dest, offset, input_rate);
-
-  channel_lpf = gr::filter::fft_filter_ccf::make(decim, channel_lpf_taps);
-
-  double arb_rate = (double(system_channel_rate) / resampled_rate);
-  double arb_size = 32;
-  double arb_atten = 100;
-
-  // Create a filter that covers the full bandwidth of the output signal
-
-  // If rate >= 1, we need to prevent images in the output,
-  // so we have to filter it to less than half the channel
-  // width of 0.5.  If rate < 1, we need to filter to less
-  // than half the output signal's bw to avoid aliasing, so
-  // the half-band here is 0.5*rate.
-  // double percent = 0.80;
-  double percent = 1.00; // Slightly widening this filter helps wideband and makes the audio a little better when using a higher sample rate
-
-  if (arb_rate <= 1) {
-    double halfband = 0.5 * arb_rate;
-    double bw = percent * halfband;
-    double tb = (percent / 2.0) * halfband;
-
-// BOOST_LOG_TRIVIAL(info) << "Arb Rate: " << arb_rate << " Half band: " << halfband << " bw: " << bw << " tb: " <<
-// tb;
-
-// As we drop the bw factor, the optfir filter has a harder time converging;
-// using the firdes method here for better results.
-#if GNURADIO_VERSION < 0x030900
-    arb_taps = gr::filter::firdes::low_pass_2(arb_size, arb_size, bw, tb, arb_atten, gr::filter::firdes::WIN_BLACKMAN_HARRIS);
-#else
-    arb_taps = gr::filter::firdes::low_pass_2(arb_size, arb_size, bw, tb, arb_atten, gr::fft::window::WIN_BLACKMAN_HARRIS);
-#endif
-    double tap_total = inital_lpf_taps.size() + channel_lpf_taps.size() + arb_taps.size();
-    BOOST_LOG_TRIVIAL(info) << "\t Analog Recorder Taps - initial: " << inital_lpf_taps.size() << " channel: " << channel_lpf_taps.size() << " ARB: " << arb_taps.size() << " Total: " << tap_total;
-  } else {
-    BOOST_LOG_TRIVIAL(error) << "Something is probably wrong! Resampling rate too low";
-    exit(1);
-  }
-
-  arb_resampler = gr::filter::pfb_arb_resampler_ccf::make(arb_rate, arb_taps);
-
-
-  // on a trunked network where you know you will have good signal, a carrier
-  // power squelch works well. real FM receviers use a noise squelch, where
-  // the received audio is high-passed above the cutoff and then fed to a
-  // reverse squelch. If the power is then BELOW a threshold, open the squelch.
-
-  // Non-blocking as we are using squelch_two as a gate.
-  squelch = gr::analog::pwr_squelch_cc::make(squelch_db, 0.01, 10, false);
+  // The Prefilter provides the initial squelch for the channel
+  prefilter = xlat_channelizer::make(input_rate, 2, 16000, center_freq, true);
+  prefilter->set_analog_squelch(true);
 
   //  based on squelch code form ham2mon
   // set low -200 since its after demod and its just gate for previous squelch so that the audio
@@ -195,7 +129,7 @@ analog_recorder::analog_recorder(Source *src, Recorder_Type type, float tone_fre
   squelch_two = gr::analog::pwr_squelch_ff::make(-200, 0.01, 0, true);
 
   if (use_tone_squelch) {
-    tone_squelch = gr::analog::ctcss_squelch_ff::make(wav_sample_rate, this->tone_freq, 0.01, wav_sample_rate, 0, false);
+    tone_squelch = gr::analog::ctcss_squelch_ff::make(wav_sample_rate, this->tone_freq, 0.01, ctcss_length, 0, false);
   }
   // k = quad_rate/(2*math.pi*max_dev) = 48k / (6.283185*5000) = 1.527
 
@@ -213,10 +147,10 @@ analog_recorder::analog_recorder(Source *src, Recorder_Type type, float tone_fre
   calculate_iir_taps(d_tau);
   deemph = gr::filter::iir_filter_ffd::make(d_fftaps, d_fbtaps);
 
-  audio_resampler_taps = design_filter(1, (system_channel_rate / wav_sample_rate)); // Calculated to make sample rate changable -- must be an integer
-  BOOST_LOG_TRIVIAL(info) << "Analog Audio Resampler Taps: " << audio_resampler_taps.size() << " rate: " << system_channel_rate / wav_sample_rate;
+  audio_resampler_taps = design_filter(1, decim_factor); // Calculated to make sample rate changable -- must be an integer
+
   // downsample from 48k to 8k
-  decim_audio = gr::filter::rational_resampler_fff::make(1, 2); // Calculated to make sample rate changable
+  decim_audio = gr::filter::fir_filter_fff::make(1, decim_factor, audio_resampler_taps); // Calculated to make sample rate changable
 
   // tm *ltm = localtime(&starttime);
 
@@ -250,21 +184,12 @@ analog_recorder::analog_recorder(Source *src, Recorder_Type type, float tone_fre
 
   // using squelch
   connect(self(), 0, prefilter, 0);
-  connect(prefilter, 0,  channel_lpf, 0);
-  if (arb_rate == 1) {
-    connect(channel_lpf, 0, squelch, 0);
-  } else {
-    connect(channel_lpf, 0, arb_resampler, 0);
-    connect(arb_resampler, 0, squelch, 0);
-  }
-  connect(squelch, 0, demod, 0);
+  connect(prefilter, 0, demod, 0);
   connect(demod, 0, deemph, 0);
   if (use_tone_squelch) {
-    connect(deemph, 0, decim_audio, 0);
+    connect(deemph, 0,  decim_audio, 0);
     connect(decim_audio, 0, tone_squelch, 0);
-    connect(tone_squelch, 0,   squelch_two, 0);
-    
-
+    connect(tone_squelch, 0, squelch_two, 0);
   } else {
     connect(deemph, 0, decim_audio, 0);
     connect(decim_audio, 0, squelch_two, 0);
@@ -345,20 +270,16 @@ void analog_recorder::set_enabled(bool enabled) {
 }
 
 bool analog_recorder::is_squelched() {
-  return is_idle();
-  
-  //return prefilter->is_squelched();
+  return prefilter->is_squelched();
 }
 
 double analog_recorder::get_pwr() {
-  return 0;
-  //return prefilter->get_pwr();
+  return prefilter->get_pwr();
 }
 
 bool analog_recorder::is_idle() {
   if (state == ACTIVE) {
-    return !squelch->unmuted();
-    //return prefilter->is_squelched();
+    return prefilter->is_squelched();
   }
   return true;
 }
@@ -372,8 +293,7 @@ double analog_recorder::get_freq() {
 }
 
 int analog_recorder::get_freq_error() { // get frequency error from FLL and convert to Hz
-  return 0;
-  //return prefilter->get_freq_error();
+  return prefilter->get_freq_error();
 }
 
 void analog_recorder::set_source(long src) {
@@ -404,8 +324,7 @@ void analog_recorder::tune_freq(double f) {
   chan_freq = f;
   int offset_amount = (center_freq - f);
 
-  prefilter->set_center_freq(offset_amount);
-  //prefilter->tune_offset(offset_amount);
+  prefilter->tune_offset(offset_amount);
 }
 
 void analog_recorder::decoder_callback_handler(long unitId, const char *signaling_type, gr::blocks::SignalType signal) {
@@ -440,7 +359,7 @@ bool analog_recorder::start(Call *call) {
 
 
 
-
+  // BOOST_LOG_TRIVIAL(error) << "Setting squelch to: " << squelch_db << " block says: " << squelch->threshold();
   levels->set_k(system->get_analog_levels());
   int d_max_dev = system->get_max_dev();
   /*
@@ -450,9 +369,7 @@ bool analog_recorder::start(Call *call) {
   demod->set_gain(quad_gain);
 
   int offset_amount = (center_freq - chan_freq);
-  //prefilter->tune_offset(offset_amount);
-  prefilter->set_center_freq(chan_freq - center_freq);
-  
+  prefilter->tune_offset(offset_amount);
 
   wav_sink->start_recording(call);
 
@@ -460,8 +377,6 @@ bool analog_recorder::start(Call *call) {
   if (conventional) {
     Call_conventional *conventional_call = dynamic_cast<Call_conventional *>(call);
     squelch_db = conventional_call->get_squelch_db();
-    BOOST_LOG_TRIVIAL(info) << "Conventional - with Squelch: " << squelch_db;
-    squelch->set_threshold(squelch_db);
     if (conventional_call->get_signal_detection()) {
       set_enabled(false);
     } else {
@@ -469,15 +384,12 @@ bool analog_recorder::start(Call *call) {
     }
   } else {
     squelch_db = system->get_squelch_db();
-    BOOST_LOG_TRIVIAL(info) << "Trunked - with Squelch: " << squelch_db;
-    squelch->set_threshold(squelch_db);
     set_enabled(true);
   }
   
   std::string loghdr = log_header(call->get_short_name(),call->get_call_num(),this->call->get_talkgroup_display(),chan_freq);
   BOOST_LOG_TRIVIAL(info) << loghdr << "\u001b[32mStarting Analog Recorder Num [" << rec_num << "]\u001b[0m \tSquelch: " << squelch_db;
-  BOOST_LOG_TRIVIAL(error) << "Setting squelch to: " << squelch_db << " block says: " << squelch->threshold();
-  //prefilter->set_squelch_db(squelch_db);
+  prefilter->set_squelch_db(squelch_db);
   return true;
 }
 

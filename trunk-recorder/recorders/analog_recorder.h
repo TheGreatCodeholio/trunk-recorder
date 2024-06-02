@@ -117,6 +117,8 @@ private:
   float quad_gain;
   double wav_sample_rate;
   double squelch_db;
+  int decim_factor;
+  int ctcss_length;
   time_t timestamp;
   time_t starttime;
   bool use_tone_squelch;
@@ -150,7 +152,7 @@ private:
 
   gr::blocks::multiply_const_ff::sptr levels;
   gr::filter::pfb_arb_resampler_ccf::sptr arb_resampler;
-  gr::filter::rational_resampler_fff::sptr decim_audio;
+  gr::filter::fir_filter_fff::sptr decim_audio;
   gr::filter::fir_filter_fff::sptr high_f;
   gr::filter::fir_filter_fff::sptr low_f;
 

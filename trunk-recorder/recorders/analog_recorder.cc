@@ -12,31 +12,24 @@ using namespace std;
 bool analog_recorder::logging = false;
 // static int rec_counter = 0;
 
-std::vector<float> design_filter(double interpolation, double deci) {
+std::vector<float> design_filter(double input_sample_rate, double output_sample_rate) {
   float beta = 5.0;
-  // Ensure the cutoff frequency is low enough to pass CTCSS tones
-  float cutoff_freq = 300.0; // Cutoff frequency in Hz, can be adjusted as needed
-  float transition_width = 50.0; // Transition width in Hz, can be adjusted as needed
 
-  // Normalize frequencies by the decimation factor
-  float nyquist_rate = 0.5 * deci;
-  float normalized_cutoff = cutoff_freq / nyquist_rate;
-  float normalized_transition_width = transition_width / nyquist_rate;
 
 #if GNURADIO_VERSION < 0x030900
   std::vector<float> result = gr::filter::firdes::low_pass(
-      interpolation,
-      deci,
-      normalized_cutoff,
-      normalized_transition_width,
+      1,
+      input_sample_rate,
+      output_sample_rate / 2,
+      .1,
       gr::filter::firdes::WIN_KAISER,
       beta);
 #else
   std::vector<float> result = gr::filter::firdes::low_pass(
-      interpolation,
-      deci,
-      normalized_cutoff,
-      normalized_transition_width,
+      1,
+      input_sample_rate,
+      output_sample_rate / 2,
+      .1,
       gr::fft::window::WIN_KAISER,
       beta);
 #endif
@@ -219,7 +212,7 @@ analog_recorder::analog_recorder(Source *src, Recorder_Type type, float tone_fre
   calculate_iir_taps(d_tau);
   deemph = gr::filter::iir_filter_ffd::make(d_fftaps, d_fbtaps);
 
-  audio_resampler_taps = design_filter(1, (system_channel_rate / wav_sample_rate)); // Calculated to make sample rate changable -- must be an integer
+  audio_resampler_taps = design_filter(system_channel_rate, wav_sample_rate); // Calculated to make sample rate changable -- must be an integer
   BOOST_LOG_TRIVIAL(info) << "Analog Audio Resampler Taps: " << audio_resampler_taps.size() << " rate: " << system_channel_rate / wav_sample_rate;
   // downsample from 48k to 8k
   decim_audio = gr::filter::fir_filter_fff::make((system_channel_rate / wav_sample_rate), audio_resampler_taps); // Calculated to make sample rate changable

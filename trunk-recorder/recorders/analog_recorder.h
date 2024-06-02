@@ -34,7 +34,8 @@
 #include <gnuradio/filter/iir_filter_ffd.h>
 
 #include <gnuradio/analog/ctcss_squelch_ff.h>
-#include <gnuradio/analog/pwr_squelch_cc.h>
+#include "../gr_blocks/pwr_squelch_cc.h"
+//#include <gnuradio/analog/pwr_squelch_cc.h>
 #include <gnuradio/analog/pwr_squelch_ff.h>
 #include <gnuradio/analog/quadrature_demod_cf.h>
 
@@ -121,12 +122,14 @@ private:
   bool use_tone_squelch;
 
   State state;
+  std::vector<float> inital_lpf_taps;
   std::vector<float> channel_lpf_taps;
   std::vector<float> lpf_taps;
   std::vector<float> audio_resampler_taps;
   std::vector<float> sym_taps;
   std::vector<float> high_f_taps;
   std::vector<float> low_f_taps;
+  std::vector<float> arb_taps;
   /* De-emph IIR filter taps */
   std::vector<double> d_fftaps; /*! Feed forward taps. */
   std::vector<double> d_fbtaps; /*! Feed back taps. */
@@ -139,7 +142,8 @@ private:
 
   /* GR blocks */
   // channelizer::sptr prefilter;
-  xlat_channelizer::sptr prefilter;
+  //xlat_channelizer::sptr prefilter;
+  freq_xlating_fft_filter_sptr prefilter;
   gr::filter::iir_filter_ffd::sptr deemph;
   gr::filter::fir_filter_fff::sptr sym_filter;
   gr::filter::fft_filter_ccf::sptr channel_lpf;
@@ -149,6 +153,8 @@ private:
   gr::filter::rational_resampler_fff::sptr decim_audio;
   gr::filter::fir_filter_fff::sptr high_f;
   gr::filter::fir_filter_fff::sptr low_f;
+
+  gr::analog::pwr_squelch_cc::sptr squelch;
   gr::analog::pwr_squelch_ff::sptr squelch_two;
   gr::analog::ctcss_squelch_ff::sptr tone_squelch;
 

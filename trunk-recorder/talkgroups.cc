@@ -57,6 +57,7 @@ void Talkgroups::load_talkgroups(int sys_num, std::string filename) {
     int priority = 1;
     unsigned long preferredNAC = 0;
     long tg_number = 0;
+    double timeout_time = 0.0;
     std::string alpha_tag = "";
     std::string description = "";
     std::string tag = "";
@@ -98,6 +99,10 @@ void Talkgroups::load_talkgroups(int sys_num, std::string filename) {
       group = row["Category"].get<std::string>();
     }
 
+    if (reader.index_of("Timeout Time") >= 0 && row["Timeout Time"].is_num()) {
+      timeout_time = row["Timeout Time"].get<double>();
+    }
+
     if ((reader.index_of("Priority") >= 0) && row["Priority"].is_int()) {
       priority = row["Priority"].get<int>();
     }
@@ -105,7 +110,7 @@ void Talkgroups::load_talkgroups(int sys_num, std::string filename) {
     if ((reader.index_of("Preferred NAC") >= 0) && row["Preferred NAC"].is_int()) {
       preferredNAC = row["Preferred NAC"].get<unsigned long>();
     }
-    tg = new Talkgroup(sys_num, tg_number, mode, alpha_tag, description, tag, group, priority, preferredNAC);
+    tg = new Talkgroup(sys_num, tg_number, mode, alpha_tag, description, tag, group, priority, preferredNAC, timeout_time);
     talkgroups.push_back(tg);
     lines_pushed++;
   }
@@ -125,7 +130,7 @@ void Talkgroups::load_channels(int sys_num, std::string filename) {
   format.trim({' ', '\t'});
   CSVReader reader(filename, format);
   std::vector<std::string> headers = reader.get_col_names();
-  std::vector<std::string> defined_headers = {"TG Number", "Tone", "Frequency", "Alpha Tag", "Description", "Category", "Tag", "Enable", "Comment", "Signal Detector", "Squelch"};
+  std::vector<std::string> defined_headers = {"TG Number", "Tone", "Frequency", "Alpha Tag", "Description", "Category", "Tag", "Enable", "Comment", "Signal Detector", "Squelch", "Timeout Time"};
 
   if (headers[0] != "TG Number") {
 
@@ -160,6 +165,7 @@ void Talkgroups::load_channels(int sys_num, std::string filename) {
     double freq = 0;
     double tone = 0;
     bool enable = true;
+    double timeout_time = 0.0;
 
     if ((reader.index_of("TG Number") >= 0) && !row["TG Number"].is_null() && row["TG Number"].is_int()) {
       tg_number = row["TG Number"].get<long>();
@@ -206,6 +212,9 @@ void Talkgroups::load_channels(int sys_num, std::string filename) {
       }
     }
 
+    if ((reader.index_of("Timeout Time") >= 0) && row["Timeout Time"].is_num()) {
+      timeout_time = row["Timeout Time"].get<double>();
+    }
 
     if ((reader.index_of("Enable") >= 0) && row["Enable"].is_str()) {
       if (boost::iequals(row["Enable"].get<std::string>(), "false")) {
@@ -213,7 +222,7 @@ void Talkgroups::load_channels(int sys_num, std::string filename) {
       }
     }
     if (enable) {
-      tg = new Talkgroup(sys_num, tg_number, freq, tone, alpha_tag, description, tag, group, squelch_db, signal_detector);
+      tg = new Talkgroup(sys_num, tg_number, freq, tone, alpha_tag, description, tag, group, squelch_db, signal_detector, timeout_time);
       talkgroups.push_back(tg);
       lines_pushed++;
     }

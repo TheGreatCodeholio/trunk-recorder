@@ -1,6 +1,6 @@
 #include "talkgroup.h"
 
-Talkgroup::Talkgroup(int sys_num, long num, std::string mode, std::string alpha_tag, std::string description, std::string tag, std::string group, int priority, unsigned long preferredNAC) {
+Talkgroup::Talkgroup(int sys_num, long num, std::string mode, std::string alpha_tag, std::string description, std::string tag, std::string group, int priority, unsigned long preferredNAC, double timeout_time) {
   this->sys_num = sys_num;
   this->number = num;
   this->mode = mode;
@@ -18,9 +18,11 @@ Talkgroup::Talkgroup(int sys_num, long num, std::string mode, std::string alpha_
   this->squelch_db = DB_UNSET;
   this->signal_detection = false;
 
+  this->timeout_time = timeout_time;
+
 }
 
-Talkgroup::Talkgroup(int sys_num, long num, double freq, double tone, std::string alpha_tag, std::string description, std::string tag, std::string group, double squelch_db, bool signal_detection) {
+Talkgroup::Talkgroup(int sys_num, long num, double freq, double tone, std::string alpha_tag, std::string description, std::string tag, std::string group, double squelch_db, bool signal_detection, double timeout_time) {
   this->sys_num = sys_num;
   this->number = num;
   this->mode = "Z";
@@ -37,6 +39,8 @@ Talkgroup::Talkgroup(int sys_num, long num, double freq, double tone, std::strin
   // This talkgroup is for a Conventional system and priority and preferredNAC are not used
   this->priority = 0;
   this->preferredNAC = 0;
+
+  this->timeout_time = timeout_time;
 }
 
 std::string Talkgroup::menu_string() {

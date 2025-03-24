@@ -8,6 +8,7 @@
 #include <boost/algorithm/string.hpp>
 #include <signal.h>
 #include <stdio.h>
+#include <chrono>
 
 std::string Call_impl::get_capture_dir() {
   return this->config.capture_dir;
@@ -41,6 +42,11 @@ Call_impl::Call_impl(long t, double f, System *s, Config c) {
   sys = s;
   start_time = time(NULL);
   stop_time = time(NULL);
+  start_time_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()
+        ).count();
+  stop_time_ms = 0;
   last_update = time(NULL);
   state = MONITORING;
   monitoringState = UNSPECIFIED;
@@ -56,6 +62,7 @@ Call_impl::Call_impl(long t, double f, System *s, Config c) {
   is_analog = false;
   was_update = false;
   priority = 0;
+  this->timeout_time = 0.0;
   set_freq(f);
   this->update_talkgroup_display();
 }
@@ -74,6 +81,11 @@ Call_impl::Call_impl(TrunkMessage message, System *s, Config c) {
   sys = s;
   start_time = time(NULL);
   stop_time = time(NULL);
+  start_time_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()
+        ).count();
+  stop_time_ms = 0
   last_update = time(NULL);
   state = MONITORING;
   monitoringState = UNSPECIFIED;
@@ -93,6 +105,7 @@ Call_impl::Call_impl(TrunkMessage message, System *s, Config c) {
   } else {
     was_update = true;
   }
+  this->timeout_time = 0.0;
   set_freq(message.freq);
   add_source(message.source);
   this->update_talkgroup_display();
@@ -123,6 +136,10 @@ void Call_impl::conclude_call() {
 
   // BOOST_LOG_TRIVIAL(info) << "conclude_call()";
   stop_time = time(NULL);
+  stop_time_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()
+        ).count();
 
   if (state == RECORDING || (state == MONITORING && monitoringState == SUPERSEDED)) {
     if (!recorder) {
@@ -444,6 +461,14 @@ bool Call_impl::get_conversation_mode() {
     return false;
   }
   return sys->get_conversation_mode();
+}
+
+void Call_impl::set_timeout_time(double t) {
+  this->timeout_time = t;
+}
+
+double Call_impl::get_timeout_time() const {
+  return timeout_time;
 }
 
 void Call_impl::update_talkgroup_display() {

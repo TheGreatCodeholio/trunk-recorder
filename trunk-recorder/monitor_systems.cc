@@ -218,6 +218,12 @@ void manage_conventional_call(Call *call, Config &config) {
   if (call->get_recorder()) {
     // if any recording has happened
 
+    //get timeout global or talkgroup
+    double tg_timeout = call->get_timeout_time();
+    double effective_timeout = (tg_timeout > 0.0)
+                                  ? tg_timeout
+                                  : config.call_timeout;
+
     if (call->get_current_length() > 0) {
       
       BOOST_LOG_TRIVIAL(trace) << "[" << call->get_short_name() << "]\t\033[0;34m" << call->get_call_num() << "C\033[0m Call Length: " << call->get_current_length() << "s\t Idle: " << call->get_recorder()->is_idle() << "\t Squelched: " << call->get_recorder()->is_squelched() << " Idle Count: " << call->get_idle_count();
@@ -236,7 +242,7 @@ void manage_conventional_call(Call *call, Config &config) {
       }
 
       // if no additional recording has happened in the past X periods, stop and open new file
-      if (call->get_idle_count() > config.call_timeout) {
+      if (call->get_idle_count() > effective_timeout) {
         Recorder *recorder = call->get_recorder();
         call->conclude_call();
         call->restart_call();
@@ -278,9 +284,15 @@ void manage_calls(Config &config, std::vector<Call *> &calls) {
       continue;
     }
 
+    // Get Call Timeout Global or Talkgroup
+    double tg_timeout = call->get_timeout_time();
+    double effective_timeout = (tg_timeout > 0.0)
+                                 ? tg_timeout
+                                 : config.call_timeout;
+
     // Handle Trunked Calls
 
-    if ((state == MONITORING) && (call->since_last_update() > config.call_timeout)) {
+    if ((state == MONITORING) && (call->since_last_update() > effective_timeout) {
       ended_call = true;
       it = calls.erase(it);
       delete call;
@@ -293,7 +305,7 @@ void manage_calls(Config &config, std::vector<Call *> &calls) {
       // Stop the call if:
       // - there hasn't been an UPDATE for it on the Control Channel in X seconds AND the recorder hasn't written anything in X seconds
 
-      if ((recorder->since_last_write() > config.call_timeout) && (call->since_last_update() > config.call_timeout)) {
+      if ((recorder->since_last_write() > effective_timeout) && (call->since_last_update() > effective_timeout)) {
         std::string loghdr = log_header( call->get_short_name(), call->get_call_num(), call->get_talkgroup_display(), call->get_freq());
         BOOST_LOG_TRIVIAL(trace) << loghdr << "\u001b[36m Stopping Call because of Recorder \u001b[0m Rec last write: " << recorder->since_last_write() << " State: " << format_state(recorder->get_state());
         call->conclude_call();
@@ -306,7 +318,7 @@ void manage_calls(Config &config, std::vector<Call *> &calls) {
         delete call;
         continue;
       }
-    } else if (call->since_last_update() > config.call_timeout) {
+    } else if (call->since_last_update() > effective_timeout) {
       Recorder *recorder = call->get_recorder();
       std::string loghdr = log_header( call->get_short_name(), call->get_call_num(), call->get_talkgroup_display(), call->get_freq());
       BOOST_LOG_TRIVIAL(trace) << loghdr << "\u001b[36m  Call UPDATEs has been inactive for more than " << config.call_timeout << " Sec \u001b[0m Rec last write: " << recorder->since_last_write() << " State: " << format_state(recorder->get_state());
@@ -479,8 +491,16 @@ void handle_call_grant(TrunkMessage message, System *sys, bool grant_message, Co
 
     if (talkgroup) {
       call->set_talkgroup_tag(talkgroup->alpha_tag);
+
+      if (talkgroup->timeout_time > 0.0) {
+        call->set_timeout_time(talkgroup->timeout_time);
+      } else {
+        call->set_timeout_time(0.0); // meaning "use global fallback"
+      }
+
     } else {
       call->set_talkgroup_tag("-");
+      call->set_timeout_time(0.0);
     }
 
     boost::format original_call_data;

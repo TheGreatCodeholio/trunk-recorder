@@ -91,6 +91,8 @@ public:
   virtual bool get_conversation_mode() = 0;
   virtual System *get_system() = 0;
   virtual std::vector<Transmission> get_transmissions() = 0;
+  virtual void set_timeout_time(double t) = 0;
+  virtual double get_timeout_time() const = 0;
 };
 
 #endif

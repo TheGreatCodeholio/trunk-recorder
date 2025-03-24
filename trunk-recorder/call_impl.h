@@ -93,6 +93,8 @@ public:
   bool get_conversation_mode();
   System *get_system();
   std::vector<Transmission> get_transmissions();
+  virtual void set_timeout_time(double t) = 0;
+  virtual double get_timeout_time() const = 0;
 
 protected:
   State state;
@@ -114,6 +116,8 @@ protected:
   int idle_count;
   time_t stop_time;
   time_t start_time;
+  long long start_time_ms;
+  long long stop_time_ms;
   bool debug_recording;
   bool sigmf_recording;
   bool was_update;
@@ -142,6 +146,7 @@ protected:
   std::string talkgroup_display;
   std::string talkgroup_tag;
   void update_talkgroup_display();
+  double timeout_time;
 };
 
 int plugman_signal(long unitId, const char *signaling_type, gr::blocks::SignalType sig_type, Call *call, System *system, Recorder *recorder);

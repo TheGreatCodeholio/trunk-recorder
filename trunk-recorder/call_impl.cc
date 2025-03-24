@@ -85,7 +85,7 @@ Call_impl::Call_impl(TrunkMessage message, System *s, Config c) {
         std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()
         ).count();
-  stop_time_ms = 0
+  stop_time_ms = 0;
   last_update = time(NULL);
   state = MONITORING;
   monitoringState = UNSPECIFIED;

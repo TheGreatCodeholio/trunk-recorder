@@ -107,6 +107,8 @@ struct Call_Data_t {
   double noise;
   long start_time;
   long stop_time;
+  long long start_time_ms;
+  long long stop_time_ms;
   long error_count;
   long spike_count;
   bool encrypted;

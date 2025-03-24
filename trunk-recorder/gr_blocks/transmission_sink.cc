@@ -240,7 +240,7 @@ void transmission_sink::end_transmission() {
     transmission.start_time = d_start_time; // Start time of the Call
     transmission.stop_time = d_stop_time;   // when the Call eneded
     transmission.start_time_ms  = d_start_time_ms;
-    transmission.stop_time_ms   = d_stop_time_ms
+    transmission.stop_time_ms   = d_stop_time_ms;
     transmission.sample_count = d_sample_count;
     transmission.spike_count = d_spike_count;
     transmission.error_count = d_error_count;

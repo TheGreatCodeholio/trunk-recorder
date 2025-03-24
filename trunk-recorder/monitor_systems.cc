@@ -292,7 +292,7 @@ void manage_calls(Config &config, std::vector<Call *> &calls) {
 
     // Handle Trunked Calls
 
-    if ((state == MONITORING) && (call->since_last_update() > effective_timeout) {
+    if ((state == MONITORING) && (call->since_last_update() > effective_timeout)) {
       ended_call = true;
       it = calls.erase(it);
       delete call;

@@ -93,8 +93,8 @@ public:
   bool get_conversation_mode();
   System *get_system();
   std::vector<Transmission> get_transmissions();
-  virtual void set_timeout_time(double t) = 0;
-  virtual double get_timeout_time() const = 0;
+  virtual void set_timeout_time(double t) override;
+  virtual double get_timeout_time() const override;
 
 protected:
   State state;

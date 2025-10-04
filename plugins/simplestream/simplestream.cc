@@ -18,7 +18,7 @@ struct plugin_t {
 };
 
 struct stream_t {
-  unsigned long TGID;
+  long TGID;
   long tcp_index;
   std::string address;
   std::string short_name;
@@ -65,23 +65,41 @@ class Simple_Stream : public Plugin_Api {
   int audio_stream(Call *call, Recorder *recorder, int16_t *samples, int sampleCount){
     //Call local_call = *call;
     System *call_system = call->get_system();
-    uint32_t call_tgid = call->get_talkgroup();
+    int32_t call_tgid = call->get_talkgroup();
     int32_t call_src = call->get_current_source_id();
     uint32_t call_freq = call->get_freq();
     std::string call_short_name = call->get_short_name();
     std::string call_src_tag = call_system->find_unit_tag(call_src);
-    std::vector<unsigned long> patched_talkgroups = call_system->get_talkgroup_patch(call_tgid);
+    std::vector<unsigned long> unsigned_patched_talkgroups = call_system->get_talkgroup_patch(call_tgid);
+    std::vector<long> patched_talkgroups;
+    // Convert unsigned long to signed long, preserving negative values
+    for (auto tgid : unsigned_patched_talkgroups) {
+      patched_talkgroups.push_back(static_cast<long>(tgid));
+    }
 
-    Recorder local_recorder = *recorder;
+    if(call_src == -1){
+      if(call->get_transmissions().size() > 0){
+        // Get the source from the most recent transmission
+        auto transmissions = call->get_transmissions();
+        call_src = transmissions.back().source;
+        BOOST_LOG_TRIVIAL(info) << "using source " << call_src << " from most recent transmission";
+      }
+      else{
+        BOOST_LOG_TRIVIAL(info) << "no source found for call - leaving src as -1";
+      }
+    }
+
+    Recorder& local_recorder = *recorder;
     int recorder_id = local_recorder.get_num();
+    long wav_hz = local_recorder.get_wav_hz();
     boost::system::error_code error;
     BOOST_FOREACH (auto stream, streams){
       if (0==stream.short_name.compare(call_short_name) || (0==stream.short_name.compare(""))){ //Check if shortName matches or is not specified
         if (patched_talkgroups.size() == 0){
-          patched_talkgroups.push_back(call_tgid);
+          patched_talkgroups.push_back(call_tgid);  //call_info.talkgroup may be negative - we cast stream.TGID to signed for comparison
         }
         BOOST_FOREACH (auto TGID, patched_talkgroups){
-          if ((TGID==stream.TGID || stream.TGID==0)){  //setting TGID to 0 in the config file will stream everything
+          if ((TGID==static_cast<long>(stream.TGID)) || stream.TGID==0){  //setting TGID to 0 in the config file will stream everything
             BOOST_LOG_TRIVIAL(debug) << "got " <<sampleCount <<" samples - " <<sampleCount*2<<" bytes from recorder "<<recorder_id<<" for TGID "<<TGID;
             json json_object;
             std::string json_string;
@@ -95,7 +113,7 @@ class Simple_Stream : public Plugin_Api {
                  {"patched_talkgroups",patched_talkgroups},
                  {"freq", call_freq},
                  {"short_name", call_short_name},
-                 {"audio_sample_rate",local_recorder.get_wav_hz()},
+                 {"audio_sample_rate",wav_hz},
                  {"event","audio"},
               };
               json_string = json_object.dump();
@@ -125,27 +143,40 @@ class Simple_Stream : public Plugin_Api {
   int call_start(Call *call){
     boost::system::error_code error;
     System *call_system = call->get_system();
-    uint32_t call_tgid = call->get_talkgroup();
+    int32_t call_tgid = call->get_talkgroup();
     int32_t call_src = call->get_current_source_id();
     uint32_t call_freq = call->get_freq();
     std::string call_short_name = call->get_short_name();
     std::string call_src_tag = call_system->find_unit_tag(call_src);
     std::string call_tgid_tag = call->get_talkgroup_tag();
-    std::vector<unsigned long> patched_talkgroups = call_system->get_talkgroup_patch(call_tgid);
+    std::vector<unsigned long> unsigned_patched_talkgroups = call_system->get_talkgroup_patch(call_tgid);
+    std::vector<long> patched_talkgroups;
+    // Convert unsigned long to signed long, preserving negative values
+    for (auto tgid : unsigned_patched_talkgroups) {
+      patched_talkgroups.push_back(static_cast<long>(tgid));
+    }
+
+    if(call_src == -1){
+      if(call->get_transmissions().size() > 0){
+        // Get the source from the most recent transmission
+        auto transmissions = call->get_transmissions();
+        call_src = transmissions.back().source;
+      }
+    }
     
     BOOST_FOREACH (auto stream, streams){
       if (stream.sendJSON == true && stream.sendCallStart == true){
         if (0==stream.short_name.compare(call_short_name) || (0==stream.short_name.compare(""))){ //Check if shortName matches or is not specified
           if (patched_talkgroups.size() == 0){
-            patched_talkgroups.push_back(call_tgid);
+            patched_talkgroups.push_back(call_tgid);  //call_info.talkgroup may be negative - we cast stream.TGID to signed for comparison
           }
           std::vector<std::string> patched_talkgroup_tags;
           BOOST_FOREACH (auto TGID, patched_talkgroups){
-            Talkgroup* this_tg = call_system->find_talkgroup(TGID);
+            Talkgroup* this_tg = call_system->find_talkgroup(static_cast<unsigned long>(TGID));
             if (this_tg != nullptr) {
               patched_talkgroup_tags.push_back(this_tg->alpha_tag);
             }
-            if ((TGID==stream.TGID || stream.TGID==0)){  //setting TGID to 0 in the config file will stream everything
+            if ((TGID==static_cast<long>(stream.TGID)) || stream.TGID==0){  //setting TGID to 0 in the config file will stream everything
               json json_object;
               std::string json_string;
               std::vector<boost::asio::const_buffer> send_buffer;
@@ -186,12 +217,17 @@ class Simple_Stream : public Plugin_Api {
     BOOST_FOREACH (auto stream, streams){
       if (stream.sendJSON == true && stream.sendCallEnd == true){
         if (0==stream.short_name.compare(call_info.short_name) || (0==stream.short_name.compare(""))){ //Check if shortName matches or is not specified
-          std::vector<unsigned long> patched_talkgroups = call_info.patched_talkgroups;
-          if (patched_talkgroups.size() == 0){
-            patched_talkgroups.push_back(call_info.talkgroup);
+          std::vector<long> patched_talkgroups;
+          if (call_info.patched_talkgroups.size() == 0){
+            patched_talkgroups.push_back(call_info.talkgroup); //call_info.talkgroup may be negative - we cast stream.TGID to signed for comparison
+          } else {
+            // Convert existing unsigned long values to signed long
+            for (auto tgid : call_info.patched_talkgroups) {
+              patched_talkgroups.push_back(static_cast<long>(tgid));
+            }
           }
           BOOST_FOREACH (auto TGID, patched_talkgroups){
-            if ((TGID==stream.TGID || stream.TGID==0)){  //setting TGID to 0 in the config file will stream everything
+            if ((TGID == static_cast<long>(stream.TGID)) || stream.TGID==0){  //setting TGID to 0 in the config file will stream everything
               json json_object;
               std::string json_string;
               std::vector<boost::asio::const_buffer> send_buffer;

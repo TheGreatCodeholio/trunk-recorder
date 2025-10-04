@@ -41,7 +41,7 @@ Center Frequency Calculators:
 Configuration File:
 - https://www.radioetcetera.site/trunk-recorder-config-editor/ - tool for using a GUI to create config.json files
 - https://github.com/AlertPageSDR/tr_configurator - If you have a Radio Reference Premium account, you can use this tool to automatically generate a config.json based on the RR data for a given system (or systems)
-- https://github.com/robotastic/trunk-recorder-configs - example configurations for different systems
+- https://github.com/TrunkRecorder/trunk-recorder-configs - example configurations for different systems
 
 ### Gain
 
@@ -185,8 +185,8 @@ There is a list of available Plugins [here](./Plugins.md).
 | Key              | Required | Default Value | Type                        | Description                                                  |
 | :--------------- | :------: | :-----------: | --------------------------- | ------------------------------------------------------------ |
 | driver           |    ✓     |               | **"sigmffile"**| Specify that you wish to use a SigMF based source block              |
-| sigmfMeta          |    ✓     |               | string                      | Path and filenme for the SigMF metadata File                            |
-| sigmfData          |    ✓     |               | string                      | Path and filenme for the SigMF data File                            |
+| sigmfMeta          |    ✓     |               | string                      | Path and filename for the SigMF metadata File                            |
+| sigmfData          |    ✓     |               | string                      | Path and filename for the SigMF data File                            |
 | repeat           |          |     false     | **true** / **false**        | whether to repeat playback of the IQ file when it reaches the end |
 | digitalRecorders |          |               | number                      | The number of Digital Recorders to have attached to this source. This is essentially the number of simultaneous calls you can record at the same time in the frequency range that this Source will be tuned to. It is limited by the CPU power of the machine. Some experimentation might be needed to find the appropriate number. *This is only required for Trunk systems. Channels in Conventional systems have dedicated recorders and do not need to be included here.* |
 | analogRecorders  |          |               | number                      | The number of Analog Recorder to have attached to this source. The same as Digital Recorders except for Analog Voice channels. *This is only required for Trunk systems. Channels in Conventional systems have dedicated recorders and do not need to be included here.* |
@@ -199,7 +199,7 @@ There is a list of available Plugins [here](./Plugins.md).
 | Key              | Required | Default Value | Type                        | Description                                                  |
 | :--------------- | :------: | :-----------: | --------------------------- | ------------------------------------------------------------ |
 | driver           |    ✓     |               | **"iqfile"**| Specify that you wish to use an IQ File based source block              |
-| iqfile           |    ✓     |               | string                      | Path and filenme for the IQ File                            |
+| iqfile           |    ✓     |               | string                      | Path and filename for the IQ File                            |
 | repeat           |          |     false     | **true** / **false**        | whether to repeat playback of the IQ file when it reaches the end |
 | center           |    ✓     |               | number                      | The center frequency in Hz to tune the SDR to                |
 | rate             |    ✓     |               | number                      | The sampling rate to set the SDR to, in samples / second     |
@@ -232,7 +232,7 @@ There is a list of available Plugins [here](./Plugins.md).
 | transmissionArchive    |          | false                      | **true** / **false**                                                         | Should each of the individual transmission be kept? These transmission are combined together with other recent ones to form a single call. |
 | callLog                |          | true                       | **true** / **false**                                                         | Should a json file with the call details be kept after successful uploads? |
 | analogLevels           |          | 8                          | number (1-32)                                                                | The amount of amplification that will be applied to the analog audio. |
-| maxDev                 |          | 4000                       | number                                                                       | The maximum deviation for analog channels. If you analog recordings sound good or if you have a completely digital system, then there is no need to touch this. |
+| maxDev                 |          | 5000                       | number                                                                       | The maximum deviation for analog channels. If you analog recordings sound good or if you have a completely digital system, then there is no need to touch this. |
 | digitalLevels          |          | 1                          | number (1-16)                                                                | The amount of amplification that will be applied to the digital audio. |
 | unitTagsFile           |          |                            | string                                                                       | The filename of a CSV file that provides information about the unit tags. The format for the file is described below. |
 | recordUnknown          |          | true                       | **true** / **false**                                                         | Record talkgroups if they are not listed in the Talkgroups File. |
@@ -278,14 +278,14 @@ By default, Trunk Recorder will record the call from the first site to receive t
         {
             "type": "P25",
             ...
-            "multiSite": "true",
+            "multiSite": true,
             "multiSiteSystemName": "somesharedname",
             "multiSiteSystemNumber": 1
         },
         {
             "type": "P25",
             ...
-            "multiSite": "true",
+            "multiSite": true,
             "multiSiteSystemName": "somesharedname",
             "multiSiteSystemNumber": 2
         }

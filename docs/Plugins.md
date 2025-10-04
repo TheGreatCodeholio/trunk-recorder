@@ -190,11 +190,11 @@ Community plugins can extend the features of Trunk Recorder and allow customized
 > As new plugins are developed, authors are encouraged to add to the below tables by submitting a PR to this document.
 
 #### External Plugins
-Plugins that are built out-of-tree and installed seperately from Trunk Recorder:
+Plugins that are built out-of-tree and installed separately from Trunk Recorder:
 | Plugin Name / Link                                                                              | Description                                                                                                               |
 | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| [MQTT Status](https://github.com/robotastic/trunk-recorder-mqtt-status)                         | Publishes the current status of a Trunk Recorder instance over MQTT                                                       |
-| [MQTT Statistics](https://github.com/robotastic/trunk-recorder-mqtt-statistics)                 | Publishes statistics about a Trunk Recorder instance over MQTT                                                            |
+| [MQTT Status](https://github.com/TrunkRecorder/trunk-recorder-mqtt-status)                         | Publishes the current status of a Trunk Recorder instance over MQTT                                                       |
+| [MQTT Statistics](https://github.com/TrunkRecorder/trunk-recorder-mqtt-statistics)                 | Publishes statistics about a Trunk Recorder instance over MQTT                                                            |
 | [Decode rates logger](https://github.com/rosecitytransit/trunk-recorder-decode-rate)            | Logs trunking control channel decode rates to a CSV file, and includes a PHP file that outputs an SVG graph               |
 | [Daily call log and live Web page](https://github.com/rosecitytransit/trunk-recorder-daily-log) | Creates a daily log of calls (instead of just individual JSON files) and includes an updating PHP Web page w/audio player |
 | [Prometheus exporter](https://github.com/USA-RedDragon/trunk-recorder-prometheus)               | Publishes statistics to a metrics endpoint via HTTP                                                                       |
@@ -220,7 +220,7 @@ cd /user_plugins
 git submodule add https://github.com/tr_plugin_developer/my-tr-plugin.git
 ```
 
-2. Review plugin requrements, and ensure all dependencies have been met.
+2. Review plugin requirements, and ensure all dependencies have been met.
 
 3. Return to your 'build' directory, and resume from the `cmake` step: e.g.
 ```bash
@@ -232,7 +232,7 @@ cmake ../trunk-recorder
 -- Added user plugin: my-tr-plugin
 ```
 
-4. Contine to build and install Trunk Recorder with included plugins:
+4. Continue to build and install Trunk Recorder with included plugins:
 ```bash
 make
 sudo make install

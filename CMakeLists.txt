@@ -23,7 +23,7 @@
 
 cmake_minimum_required(VERSION 3.12)
 
-project(Trunk-Recorder LANGUAGES CXX C VERSION "5.0.0")
+project(Trunk-Recorder LANGUAGES CXX C VERSION "5.0.2")
 
 
 configure_file(cmake.h.in "${PROJECT_BINARY_DIR}/cmake.h" @ONLY)
@@ -155,7 +155,6 @@ MESSAGE(STATUS "Configuring Boost C++ Libraries...")
 # Although not required on my system, some users have linking issues without
 SET(BOOST_REQUIRED_COMPONENTS
     thread
-    system
     program_options
     filesystem
     log_setup

@@ -7,7 +7,7 @@ sidebar_position: 1
 
 This page covers installing Trunk Recorder on a Linux box. I test everything on Ubuntu, but other flavors of Linux are supported. Instructions are also included for Arch Linux.
 
-## Install Prerequistes
+## Install Prerequisites
 To get started, install all of the required packages. Instructions for different versions are below:
 
 
@@ -63,7 +63,7 @@ If you are using a HackRF:
 sudo apt install -y hackrf libhackrf-dev libhackrf0
 ```
 
-### Older Ubuntu Verions...
+### Older Ubuntu Versions...
 
 These instructions should work on Ubuntu 16.x to 17.x, including Debian 9 and 10. 
 
@@ -148,7 +148,7 @@ Assuming you are in the desired directory to place both trunk-recorder and trunk
 
 ```bash
 mkdir trunk-build
-git clone https://github.com/robotastic/trunk-recorder.git
+git clone https://github.com/TrunkRecorder/trunk-recorder.git
 cd trunk-build
 cmake ../trunk-recorder
 make
@@ -217,7 +217,7 @@ The next step is to [configure Trunk Recorder](../CONFIGURE.md) for the system y
 
 ## Running trunk recorder. 
 
-If all goes well you should now have the executable named `trunk-recorder`, and created the `config.json` configuration file as described in the [Wiki](https://github.com/robotastic/trunk-recorder/wiki/Configuring-a-System) and [README](https://github.com/robotastic/trunk-recorder/blob/master/README.md#configure).
+If all goes well you should now have the executable named `trunk-recorder`, and created the `config.json` configuration file as described in the [Wiki](https://github.com/TrunkRecorder/trunk-recorder/wiki/Configuring-a-System) and [README](https://github.com/TrunkRecorder/trunk-recorder/blob/master/README.md#configure).
 
 From your build directory (e.g. `trunk-build`) you can now run
 `./trunk-recorder`

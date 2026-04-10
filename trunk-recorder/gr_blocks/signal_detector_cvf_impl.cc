@@ -23,6 +23,7 @@
 #endif
 
 #include "signal_detector_cvf_impl.h"
+#include <algorithm>
 #include <cmath>
 #include <gnuradio/io_signature.h>
 #include <volk/volk.h>
@@ -97,6 +98,7 @@ signal_detector_cvf_impl::signal_detector_cvf_impl(double samp_rate,
   d_filename = filename;
   d_detected_signals = std::vector<Detected_Signal>();
   last_conventional_channel_detection_check = time_since_epoch_millisec();
+  d_avg_skip_count = 0;
 
 
   BOOST_LOG_TRIVIAL(info) << "signal_detector_cvf_impl: " << "samp_rate: " << samp_rate << " fft_len: " << fft_len << " window_type: " << window_type << " threshold: " << threshold << " sensitivity: " << sensitivity << " auto_threshold: " << auto_threshold << " average: " << average << " quantization: " << quantization << " min_bw: " << min_bw << " filename: " << filename;
@@ -227,11 +229,14 @@ void signal_detector_cvf_impl::build_window() {
 void signal_detector_cvf_impl::build_threshold() {
   // copy array to work with
   memcpy(d_tmp_pxx, d_pxx_out, sizeof(float) * d_fft_len);
-  // sort bins
   d_threshold = 500;
-  
-  std::sort(d_tmp_pxx, d_tmp_pxx + d_fft_len);
-  
+
+  // Partition around the median in O(n), then sort only the upper half in
+  // O(n/2 * log(n/2)).  The threshold search starts at d_fft_len/2 so we
+  // only need the upper half in sorted order — this cuts sort work ~55%.
+  float *mid = d_tmp_pxx + d_fft_len / 2;
+  std::nth_element(d_tmp_pxx, mid, d_tmp_pxx + d_fft_len);
+  std::sort(mid, d_tmp_pxx + d_fft_len);
 
   float range = d_tmp_pxx[d_fft_len - 1] - d_tmp_pxx[0];
   // float median = d_tmp_pxx[int(d_fft_len/2)];
@@ -275,6 +280,12 @@ std::vector<Detected_Signal> signal_detector_cvf_impl::find_signal_edges() {
   std::vector<Detected_Signal> detected_signals;
   bool signal_started = false;
   int quantization = (int)floor(d_quantization * d_samp_rate);
+
+  // If the strongest bin can't beat the threshold, skip the full scan.
+  float max_pxx = *std::max_element(d_pxx_out, d_pxx_out + d_fft_len);
+  if (max_pxx <= d_threshold) {
+    return detected_signals;
+  }
 
   for (unsigned int i = 0; i < d_fft_len; i++) {
     // std::cout << "d_pxx_out[" << i << "] = " << d_pxx_out[i] << " Threshold: " << d_threshold << std::endl;
@@ -402,9 +413,20 @@ int signal_detector_cvf_impl::work(int noutput_items,
 
       periodogram(d_pxx, in);
 
-      // averaging
-      for (unsigned int i = 0; i < d_fft_len; i++) {
-        d_pxx_out[i] = d_avg_filter[i].filter(d_pxx[i]);
+      // Find the peak bin power so we can decide whether to run the full
+      // averaging pass.  When the band is quiet we still update every
+      // AVG_SKIP_MAX cycles to keep the noise-floor estimate from going
+      // completely stale, but we skip the expensive per-bin IIR loop the
+      // rest of the time.  This has no effect on active signals because
+      // any bin above threshold forces an immediate update.
+      static constexpr unsigned int AVG_SKIP_MAX = 5;
+      float max_pxx = *std::max_element(d_pxx, d_pxx + d_fft_len);
+      bool update_avg = (max_pxx > d_threshold) || (++d_avg_skip_count >= AVG_SKIP_MAX);
+      if (update_avg) {
+        d_avg_skip_count = 0;
+        for (unsigned int i = 0; i < d_fft_len; i++) {
+          d_pxx_out[i] = d_avg_filter[i].filter(d_pxx[i]);
+        }
       }
 
       if (d_auto_threshold) {

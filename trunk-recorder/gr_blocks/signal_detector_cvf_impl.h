@@ -48,6 +48,7 @@ private:
   gr::fft::window::win_type d_window_type;
 #endif
   uint64_t last_conventional_channel_detection_check;
+  unsigned int d_avg_skip_count;
   std::vector<float> d_window;
   std::vector<std::vector<float>> d_signal_edges;
   std::vector<std::vector<float>> d_rf_map;

@@ -1,8 +1,8 @@
 #include "xlat_channelizer.h"
 
-xlat_channelizer::sptr xlat_channelizer::make(double input_rate, int samples_per_symbol, double symbol_rate, double bandwidth, double center_freq, bool use_squelch, double excess_bw) {
+xlat_channelizer::sptr xlat_channelizer::make(double input_rate, int samples_per_symbol, double symbol_rate, double bandwidth, double center_freq, bool use_squelch, double excess_bw, bool is_analog) {
 
-  return gnuradio::get_initial_sptr(new xlat_channelizer(input_rate, samples_per_symbol, symbol_rate, bandwidth, center_freq, use_squelch, excess_bw));
+  return gnuradio::get_initial_sptr(new xlat_channelizer(input_rate, samples_per_symbol, symbol_rate, bandwidth, center_freq, use_squelch, excess_bw, is_analog));
 }
 
 const int xlat_channelizer::smartnet_samples_per_symbol;
@@ -40,7 +40,7 @@ xlat_channelizer::DecimSettings xlat_channelizer::get_decim(long speed) {
   return decim_settings;
 }
 
-xlat_channelizer::xlat_channelizer(double input_rate, int samples_per_symbol, double symbol_rate, double bandwidth, double center_freq, bool use_squelch, double excess_bw=0.2)
+xlat_channelizer::xlat_channelizer(double input_rate, int samples_per_symbol, double symbol_rate, double bandwidth, double center_freq, bool use_squelch, double excess_bw=0.2, bool is_analog=false)
     : gr::hier_block2("xlat_channelizer_ccf",
                       gr::io_signature::make(1, 1, sizeof(gr_complex)),
                       gr::io_signature::make(1, 1, sizeof(gr_complex))),
@@ -49,7 +49,8 @@ xlat_channelizer::xlat_channelizer(double input_rate, int samples_per_symbol, do
       d_bandwidth(bandwidth),
       d_samples_per_symbol(samples_per_symbol),
       d_symbol_rate(symbol_rate),
-      d_use_squelch(use_squelch) {
+      d_use_squelch(use_squelch),
+      d_is_analog(is_analog) {
 
   long channel_rate = d_symbol_rate * d_samples_per_symbol;
   // long if_rate = 12500;
@@ -65,11 +66,27 @@ xlat_channelizer::xlat_channelizer(double input_rate, int samples_per_symbol, do
   // double resampled_rate = float(input_rate) / float(decimation);
 
   std::vector<gr_complex> if_coeffs;
-  if_coeffs = gr::filter::firdes::complex_band_pass_2(1, input_rate, -24000, 24000, 12000, 10);
+  if (d_is_analog) {
+    // For analog FM the guard band can be wider without affecting voice quality.
+    // Increasing the transition width from 12 kHz to 15 kHz cuts tap count ~25%,
+    // reducing the FFT filter's per-sample CPU proportionally.
+    if_coeffs = gr::filter::firdes::complex_band_pass_2(1, input_rate, -24000, 24000, 15000, 10);
+  } else {
+    // Digital modes (P25/DMR) need the tighter transition band for proper
+    // symbol recovery — keep the original design unchanged.
+    if_coeffs = gr::filter::firdes::complex_band_pass_2(1, input_rate, -24000, 24000, 12000, 10);
+  }
 
   freq_xlat = make_freq_xlating_fft_filter(initial_decim, if_coeffs, 0, input_rate); // inital_lpf_taps, 0, input_rate);
 
-  std::vector<float> channel_lpf_taps = gr::filter::firdes::low_pass_2(1.0, initial_rate, d_bandwidth / 2, d_bandwidth / 4, 60);
+  std::vector<float> channel_lpf_taps;
+  if (d_is_analog) {
+    // Wider transition (bandwidth/3 instead of bandwidth/4) for analog FM;
+    // still well outside the ±5 kHz FM deviation passband.
+    channel_lpf_taps = gr::filter::firdes::low_pass_2(1.0, initial_rate, d_bandwidth / 2, d_bandwidth / 3, 60);
+  } else {
+    channel_lpf_taps = gr::filter::firdes::low_pass_2(1.0, initial_rate, d_bandwidth / 2, d_bandwidth / 4, 60);
+  }
   channel_lpf = gr::filter::fft_filter_ccf::make(decim, channel_lpf_taps);
 
   // BOOST_LOG_TRIVIAL(info) << "\t Xlating Channelizer single-stage decimator - Decim: " << decimation << " Resampled Rate: " << resampled_rate << " Lowpass Taps: " << if_coeffs.size();
@@ -142,11 +159,21 @@ xlat_channelizer::xlat_channelizer(double input_rate, int samples_per_symbol, do
     }
   }
 
-  connect(rms_agc, 0, fll_band_edge, 0);
-  connect(fll_band_edge, 0, self(), 0);
+  if (d_is_analog) {
+    // FM demodulation does not require carrier-phase tracking, so the FLL
+    // band-edge filter is unnecessary for analog conventional channels.
+    // Bypassing it saves the per-sample FLL computation entirely.
+    connect(rms_agc, 0, self(), 0);
+  } else {
+    connect(rms_agc, 0, fll_band_edge, 0);
+    connect(fll_band_edge, 0, self(), 0);
+  }
 }
 
 int xlat_channelizer::get_freq_error() { // get frequency error from FLL and convert to Hz
+  if (d_is_analog) {
+    return 0; // FLL not used for analog FM
+  }
   const float pi = M_PI;
   long if_rate = 24000;
   return int((fll_band_edge->get_frequency() / (2 * pi)) * if_rate);

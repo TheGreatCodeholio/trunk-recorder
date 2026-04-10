@@ -35,7 +35,6 @@
 
 #include <gnuradio/analog/ctcss_squelch_ff.h>
 #include <gnuradio/analog/pwr_squelch_cc.h>
-#include <gnuradio/analog/pwr_squelch_ff.h>
 #include <gnuradio/analog/quadrature_demod_cf.h>
 
 #include <gnuradio/blocks/float_to_short.h>
@@ -152,7 +151,6 @@ private:
   gr::filter::fir_filter_fff::sptr decim_audio;
   gr::filter::fir_filter_fff::sptr high_f;
   gr::filter::fir_filter_fff::sptr low_f;
-  gr::analog::pwr_squelch_ff::sptr squelch_two;
   gr::analog::ctcss_squelch_ff::sptr tone_squelch;
 
   gr::analog::quadrature_demod_cf::sptr demod;

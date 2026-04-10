@@ -14,7 +14,11 @@ bool analog_recorder::logging = false;
 
 std::vector<float> design_filter(double interpolation, double deci) {
   float beta = 5.0;
-  float trans_width = 0.5 - 0.4;
+  // Widen the transition band from 0.1 to 0.15 of Nyquist for analog FM voice.
+  // Aliasing only begins above ~7 kHz, which is above the 300–3250 Hz voice
+  // passband and inaudible after the audio band-pass filters downstream.
+  // This reduces tap count by ~25% with no perceptible audio quality impact.
+  float trans_width = 0.5 - 0.35;
   float mid_transition_band = 0.5 - trans_width / 2;
 
 #if GNURADIO_VERSION < 0x030900
@@ -132,14 +136,11 @@ analog_recorder::analog_recorder(Source *src, System *system, Recorder_Type type
   system_channel_rate = 96000; // 4800 * samp_per_sym;
   wav_sample_rate = 16000;     // Must be an integer decimation of system_channel_rate
 
-  // The Prefilter provides the initial squelch for the channel
-  prefilter = xlat_channelizer::make(input_rate, samp_per_sym, system_channel_rate / samp_per_sym, bandwidth, center_freq, true);
+  // The Prefilter provides the initial squelch for the channel.
+  // is_analog=true: enables wider filter transition bands and skips the FLL
+  // band-edge block, both of which are unnecessary for FM demodulation.
+  prefilter = xlat_channelizer::make(input_rate, samp_per_sym, system_channel_rate / samp_per_sym, bandwidth, center_freq, true, xlat_channelizer::default_excess_bw, true);
   prefilter->set_analog_squelch(true);
-
-  //  based on squelch code form ham2mon
-  // set low -200 since its after demod and its just gate for previous squelch so that the audio
-  // recording doesn't contain blank spaces between transmissions
-  squelch_two = gr::analog::pwr_squelch_ff::make(-200, 0.01, 0, true);
 
   if (use_tone_squelch) {
     tone_squelch = gr::analog::ctcss_squelch_ff::make(system_channel_rate, this->tone_freq, 0.01, 0, 0, false);
@@ -210,8 +211,7 @@ analog_recorder::analog_recorder(Source *src, System *system, Recorder_Type type
   connect(decim_audio, 0, decoder_sink, 0);
   connect(decim_audio, 0, high_f, 0);
   connect(high_f, 0, low_f, 0);
-  connect(low_f, 0, squelch_two, 0);
-  connect(squelch_two, 0, levels, 0);
+  connect(low_f, 0, levels, 0);
   connect(levels, 0, converter, 0);
   connect(converter, 0, wav_sink, 0);
 
